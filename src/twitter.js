@@ -297,6 +297,51 @@ class Twitter {
 			return "";
 		}
 
+		// Twitpic
+		if (tweet.full_text.indexOf('twitpic.com') > -1) {
+			tweet.extended_entities = tweet.extended_entities || {};
+			tweet.extended_entities.media = tweet.extended_entities.media || [];
+
+			const twitpic_regex = /twitpic\.com\/(\w+\ |\w+$)/gm;
+			const twitpic_regexresult = twitpic_regex.exec(tweet.full_text);
+			
+			if (twitpic_regexresult && twitpic_regexresult[1]) {
+
+				// @TODO: Cater for more than 1 twitpic entry
+
+				const twitpic_id = twitpic_regexresult[1].trim();
+				const twitpic_url = `https://twitpic.com/${twitpic_id}`;
+
+				// Prevent double injection of id which happens after script reload.
+				if (tweet.extended_entities.media.filter(m => m.media_key === twitpic_url).length == 0) {
+
+					const twitpic_html = await eleventyFetch(twitpic_url, {
+						duration: ELEVENTY_IMG_OPTIONS.cacheDuration,
+						type: "text",
+					});
+
+					if (twitpic_html) {
+						const twitpic_imgregex = /src="(.*)" alt/gm;
+						const twitpic_imgurl = twitpic_imgregex.exec(twitpic_html);
+
+						if (twitpic_imgurl) {
+							tweet.extended_entities.media.push({
+								alt_text: "",
+								media_key: twitpic_url,
+								width: 0,
+								height: 0,
+								type: "photo",
+								url: twitpic_url,
+								media_url_https: twitpic_imgurl[1],
+							});
+
+							// @TODO: Replace original text with link?
+						}
+					}
+				}
+			}
+		}
+
 		let {transform: twitterLink} = await import("@tweetback/canonical");
 		let sentimentValue = this.getSentiment(tweet);
 
